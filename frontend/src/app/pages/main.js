@@ -15,6 +15,8 @@ export default function Main() {
   const [resumeFile, setResumeFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [resumeText, setResumeText] = useState("");
+  const [results, setResults] = useState(null); // State for storing backend results
+  const [loading, setLoading] = useState(false); // Loading indicator
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -46,6 +48,44 @@ export default function Main() {
 
   const handleResumeChange = (e) => {
     setResumeText(e.target.value);
+  };
+
+  const handleScan = async () => {
+    setLoading(true); // Show loading indicator
+    const formData = new FormData();
+
+    if (resumeFile) {
+      formData.append("resume", resumeFile); // Attach the uploaded file
+    } else if (resumeText) {
+      formData.append("resume_text", resumeText); // Attach the resume text
+    } else {
+      alert("Please provide a resume.");
+      setLoading(false);
+      return;
+    }
+
+    const jobDescription = document.querySelector(".job-description-textarea").value;
+    if (!jobDescription.trim()) {
+      alert("Please provide a job description.");
+      setLoading(false);
+      return;
+    }
+
+    formData.append("job_description", jobDescription);
+
+    try {
+      const response = await fetch("http://127.0.0.1:5000/analyze", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      setResults(data); // Store the results in state
+    } catch (error) {
+      console.error("Error:", error);
+      alert("An error occurred during analysis.");
+    } finally {
+      setLoading(false); // Hide loading indicator
+    }
   };
 
   return (
@@ -111,17 +151,38 @@ export default function Main() {
             <Box className={styles.descriptionBox}>
               <textarea
                 placeholder="Copy and paste job description here..."
-                className={styles.descriptionTextarea}
+                className={`${styles.descriptionTextarea} job-description-textarea`}
               />
             </Box>
           </Grid>
         </Grid>
         <Box textAlign="right" mt={2}>
-          <Button variant="contained" size="large" color="primary">
-            Scan
+          <Button
+            variant="contained"
+            size="large"
+            color="primary"
+            onClick={handleScan}
+            disabled={loading} // Disable button when loading
+          >
+            {loading ? "Scanning..." : "Scan"}
           </Button>
         </Box>
       </Card>
+
+      {/* Display Results */}
+      {results && (
+        <Box mt={4} textAlign="center">
+          <Typography variant="h5">
+            Results
+          </Typography>
+          <Typography variant="body1" mt={2}>
+            {results.message}
+          </Typography>
+          <Typography variant="body2" mt={1}>
+            Match Percentage: {results.similarity_score}%
+          </Typography>
+        </Box>
+      )}
     </Container>
   );
 }
